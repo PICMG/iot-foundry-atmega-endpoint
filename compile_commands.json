@@ -1,0 +1,22 @@
+[
+  {
+    "directory": "/home/doug/git/atmega",
+    "command": "avr-gcc -std=gnu11 -g -Og -Wall -mmcu=atmega4809 -DF_CPU=16000000UL -Iinclude -Iinclude/core -c src/platform.c",
+    "file": "/home/doug/git/atmega/src/platform.c"
+  },
+  {
+    "directory": "/home/doug/git/atmega",
+    "command": "avr-gcc -std=gnu11 -g -Og -Wall -mmcu=atmega4809 -DF_CPU=16000000UL -Iinclude -Iinclude/core -c src/main.c",
+    "file": "/home/doug/git/atmega/src/main.c"
+  },
+  {
+    "directory": "/home/doug/git/atmega",
+    "command": "avr-gcc -std=gnu11 -g -Og -Wall -mmcu=atmega4809 -DF_CPU=16000000UL -Iinclude -Iinclude/core -c src/core/fcs.c",
+    "file": "/home/doug/git/atmega/src/core/fcs.c"
+  },
+  {
+    "directory": "/home/doug/git/atmega",
+    "command": "avr-gcc -std=gnu11 -g -Og -Wall -mmcu=atmega4809 -DF_CPU=16000000UL -Iinclude -Iinclude/core -c src/core/mctp.c",
+    "file": "/home/doug/git/atmega/src/core/mctp.c"
+  }
+]
