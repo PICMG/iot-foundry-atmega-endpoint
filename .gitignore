@@ -1,0 +1,14 @@
+.vscode/
+
+*.elf
+*.hex
+*.o
+
+reports/
+tests/__pycache__/
+include/generated_serial_config.h
+include/last_fcpu
+include/last_mcu
+include/core/
+src/core/
+

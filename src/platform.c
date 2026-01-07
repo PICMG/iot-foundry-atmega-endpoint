@@ -27,12 +27,11 @@
 #include <stdint.h>
 #include <avr/io.h>
 #include "core/platform.h"
-#include "board_config.h"
+#include "generated_serial_config.h"
 
-/* Baud helper implementations live here so board_config.h only contains
- * selection switches. Implement the common cases: DA/DB style BAUD register
- * and classic UBRR. Boards may override these by defining
- * MCTP_USART_SET_BAUD or MCTP_USART_WRITE_UBRR via BOARD_CFLAGS. */
+/* Baud helper implementations live here. Implement the common cases:
+ * DA/DB style BAUD register and classic UBRR. Boards may override these
+ * by defining MCTP_USART_SET_BAUD or MCTP_USART_WRITE_UBRR. */
 #if MCTP_BAUD_MODE == MCTP_BAUD_MODE_DA_DB
 #ifndef MCTP_USART_SET_BAUD
 #define MCTP_USART_SET_BAUD(baudval) \
@@ -44,7 +43,7 @@
 #
 /* Token-paste and register concatenation helpers (local to platform.c).
  * These are only needed when platform code needs to form register names
- * from macros; keeping them local avoids polluting board_config.h.
+ * from macros; keeping them local avoids polluting the generated header.
  */
 #define CAT(a,b) a##b
 #define CAT2(a,b) CAT(a,b)
@@ -82,11 +81,10 @@
 #endif
 #endif
 
-/* platform configuration is provided by src/board_config.h which exposes
- * MCTP_USART_NUM, MCTP_UART_TX_PORT, MCTP_UART_TX_PIN, MCTP_UART_RX_PORT,
- * MCTP_UART_RX_PIN, and MCTP_BAUD. MCU and F_CPU may also be overridden
- * via that header or via -D flags in the build.
- */
+/* Platform configuration is provided by include/generated_serial_config.h
+ * which exposes MCTP_USART_NUM, MCTP_UART_TX_PORT, MCTP_UART_TX_PIN,
+ * MCTP_UART_RX_PORT, MCTP_UART_RX_PIN, and MCTP_BAUD. MCU and F_CPU may
+ * be set via the Makefile or -D flags in the build. */
 
 /**
  * @brief Initialize platform hardware.
@@ -95,34 +93,60 @@
  * platform-specific hardware (serial interfaces, timers, etc.).
  */
 void platform_init(void) {
+#ifdef CPU_CCP
     /* set peripheral clock to 16 MHz (no divide) */
     CPU_CCP = CCP_IOREG_gc;
     CLKCTRL_MCLKCTRLB = 0;
+#endif
 
     /* Configure USART route if user provided a PORTMUX value */
-#ifdef MCTP_PORTMUX_VAL
-    PORTMUX_USARTROUTEA = MCTP_PORTMUX_VAL;
-#else
-    PORTMUX_USARTROUTEA = (PORTMUX_USART3_ALT1_gc | PORTMUX_USART0_NONE_gc |
+#ifdef PORTMUX_USARTROUTEA
+    #ifdef MCTP_PORTMUX_VAL
+        PORTMUX_USARTROUTEA = MCTP_PORTMUX_VAL;
+    #else
+        PORTMUX_USARTROUTEA = (PORTMUX_USART3_ALT1_gc | PORTMUX_USART0_NONE_gc |
                            PORTMUX_USART1_NONE_gc | PORTMUX_USART2_NONE_gc);
+    #endif
 #endif
 
     /* Configure TX pin as output and RX pin as input using configured port/pin */
-    /* Use concrete register mapping macros from board_config.h */
+    /* Use concrete register mapping macros from include/generated_serial_config.h */
     MCTP_TX_PORT_DIR |= (1 << MCTP_UART_TX_PIN);
     MCTP_RX_PORT_DIR &= ~(1 << MCTP_UART_RX_PIN);
 
+#if defined(MCTP_USART_0SERIES)
+    /* 0-series: use io-header enum values for frame format */
+    MCTP_USART_CTRLC = (USART_CHSIZE_8BIT_gc) | (USART_PMODE_DISABLED_gc) |
+                      (USART_SBMODE_1BIT_gc) | (USART_CMODE_ASYNCHRONOUS_gc);
+#elif defined(USART_CHSIZE_8BIT_gc)
     /* Frame format and mode (8N1, async) */
     MCTP_USART_CTRLC = (USART_CHSIZE_8BIT_gc) | (USART_PMODE_DISABLED_gc) |
                      (USART_SBMODE_1BIT_gc) | (USART_CMODE_ASYNCHRONOUS_gc);
+#else
+    /* Frame format and mode (8N1, async) - prefer classic bit names if present */
+#if defined(UCSZ1)
+    MCTP_USART_CTRLC = (1 << UCSZ1) | (1 << UCSZ0);
+#elif defined(UCSZ01)
+    MCTP_USART_CTRLC = (1 << UCSZ01) | (1 << UCSZ00); /* 8-bit data */
+#else
+    MCTP_USART_CTRLC = 0; /* unknown; leave as-is */
+#endif
+#endif
 
     /* Compute BAUD using board-configured abstraction. */
     const uint32_t baud = MCTP_BAUD;
     MCTP_USART_SET_BAUD(baud);
 
-    /* Enable TX/RX and (optionally) RX/DRE interrupts as in your working code */
+    /* Enable TX/RX */
+#ifdef USART_RXEN_bm
     MCTP_USART_CTRLB = USART_RXEN_bm | USART_TXEN_bm;
-    MCTP_USART_CTRLA |= USART_RXCIE_bm | USART_DREIE_bm;
+#elif defined(RXEN)
+    MCTP_USART_CTRLB = (1 << RXEN) | (1 << TXEN);
+#elif defined(RXEN0)
+    MCTP_USART_CTRLB = (1 << RXEN0) | (1 << TXEN0);
+#else
+    MCTP_USART_CTRLB = 0;
+#endif
 }
 
 /**
@@ -132,7 +156,15 @@ void platform_init(void) {
  */
 uint8_t platform_serial_has_data(void) {
     /* RX Complete flag in STATUS register indicates received data */
-    return (MCTP_USART_STATUS & USART_RXCIF_bm) ? 1 : 0;
+    #ifdef USART_RXCIF_bm        
+        return (MCTP_USART_STATUS & USART_RXCIF_bm) ? 1 : 0;
+    #elif defined(RXC)
+        return (MCTP_USART_STATUS & (1 << RXC)) ? 1 : 0;
+    #elif defined(RXC0)
+        return (MCTP_USART_STATUS & (1 << RXC0)) ? 1 : 0;
+    #else
+        return 0;
+    #endif
 }
 
 /**
@@ -142,9 +174,21 @@ uint8_t platform_serial_has_data(void) {
  */
 uint8_t platform_serial_read_byte(void) {
     /* Wait for data to be available, then read the low data register */
+    #ifdef USART_RXCIF_bm
     while (!(MCTP_USART_STATUS & USART_RXCIF_bm)) {
+            ;
+        }
+    #elif defined(RXC)
+        while (!(MCTP_USART_STATUS & (1 << RXC))) {
+            ;
+        }
+    #elif defined(RXC0)
+        while (!(MCTP_USART_STATUS & (1 << RXC0))) {
+            ;
+        }
+    #else
         ;
-    }
+    #endif
     uint8_t b = (uint8_t)MCTP_USART_RXDATAL;
     return (uint8_t)b;
 }
@@ -156,9 +200,21 @@ uint8_t platform_serial_read_byte(void) {
  */
 void platform_serial_write_byte(uint8_t b) {   
     /* Wait until Data Register Empty, then write */
-    while (!(MCTP_USART_STATUS & USART_DREIF_bm)) {
+    #ifdef USART_DREIF_bm
+        while (!(MCTP_USART_STATUS & USART_DREIF_bm)) {
+            ;
+        }
+    #elif defined(UDRE)
+        while (!(MCTP_USART_STATUS & (1 << UDRE))) {
+            ;
+        }
+    #elif defined(UDRE0)
+        while (!(MCTP_USART_STATUS & (1 << UDRE0))) {
+            ;
+        }
+    #else
         ;
-    }
+    #endif
     MCTP_USART_TXDATAL = b;
 }
 
@@ -168,5 +224,13 @@ void platform_serial_write_byte(uint8_t b) {
  * @return uint8_t Returns non-zero when writes are currently allowed.
  */
 uint8_t platform_serial_can_write(void) {
-    return (MCTP_USART_STATUS & USART_DREIF_bm) ? 1 : 0;
+    #ifdef USART_DREIF_bm
+        return (MCTP_USART_STATUS & USART_DREIF_bm) ? 1 : 0;
+    #elif defined(UDRE)
+        return (MCTP_USART_STATUS & (1 << UDRE)) ? 1 : 0;
+    #elif defined(UDRE0)
+        return (MCTP_USART_STATUS & (1 << UDRE0)) ? 1 : 0;
+    #else
+        return 0;
+    #endif
 }
