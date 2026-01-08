@@ -34,39 +34,37 @@
 #include "core/platform.h"
 #include "generated_serial_config.h"
 
-/* Baud helper implementations:
- * DA/DB style BAUD register and classic UBRR. Builds may override these
- * by defining MCTP_USART_SET_BAUD or MCTP_USART_WRITE_UBRR. */
-#if MCTP_BAUD_MODE == MCTP_BAUD_MODE_DA_DB
-    #ifndef MCTP_USART_SET_BAUD
-    #define MCTP_USART_SET_BAUD(baudval) \
-        do { \
-            uint16_t _bsel = (uint16_t)((8UL * (uint32_t)F_CPU - (baudval)) / (2UL * (baudval))); \
-            MCTP_USART_BAUD = _bsel; \
-        } while (0)
-    #endif
-#elif MCTP_BAUD_MODE == MCTP_BAUD_MODE_CLASSIC
-    #ifndef MCTP_USART_WRITE_UBRR
-        /* Default writer: place UBRR value into MCTP_USART_BAUD alias. Boards
-        * targeting classic AVRs should provide a proper MCTP_USART_WRITE_UBRR. */
-        #define MCTP_USART_WRITE_UBRR(v) do { MCTP_USART_BAUD = (v); } while (0)
-    #endif
-    #ifndef MCTP_USART_SET_BAUD
-        #define MCTP_USART_SET_BAUD(baudval) \
-            do { \
-                uint16_t _ubrr = (uint16_t)(((uint32_t)F_CPU / (16UL * (uint32_t)(baudval))) - 1UL); \
-                MCTP_USART_WRITE_UBRR(_ubrr); \
-            } while (0)
-    #endif
+/* Token-paste helpers for deriving register tokens from numeric UART index
+ * and port letters emitted by the generator (SERIAL_UART_INDEX, SERIAL_TX_PORT, etc.). */
+#define CAT2(a, b) a##b
+#define CAT3(a, b, c) a##b##c
+#define CONCAT2(a, b) CAT2(a, b)
+#define CONCAT3(a, b, c) CAT3(a, b, c)
+
+/* Derive family-specific register aliases. Use SERIAL_UART_TYPE_USART_0SERIES
+ * (emitted by the generator) to choose the naming convention. */
+#if defined(SERIAL_UART_TYPE_USART_0SERIES)
+    #define USART_RXDATAL  CONCAT3(USART, SERIAL_UART_INDEX, _RXDATAL)
+    #define USART_TXDATAL  CONCAT3(USART, SERIAL_UART_INDEX, _TXDATAL)
+    #define USART_STATUS   CONCAT3(USART, SERIAL_UART_INDEX, _STATUS)
+    #define USART_CTRLA    CONCAT3(USART, SERIAL_UART_INDEX, _CTRLA)
+    #define USART_CTRLB    CONCAT3(USART, SERIAL_UART_INDEX, _CTRLB)
+    #define USART_CTRLC    CONCAT3(USART, SERIAL_UART_INDEX, _CTRLC)
+    #define USART_BAUD     CONCAT3(USART, SERIAL_UART_INDEX, _BAUD)
+    #define TX_PORT_DIR    CONCAT3(PORT, SERIAL_TX_PORT, _DIR)
+    #define RX_PORT_DIR    CONCAT3(PORT, SERIAL_RX_PORT, _DIR)
+    #define SERIAL_BAUD_VAL SERIAL_BAUD
 #else
-    /* AUTO or unknown: fallback to DA/DB formula */
-    #ifndef MCTP_USART_SET_BAUD
-    #define MCTP_USART_SET_BAUD(baudval) \
-        do { \
-            uint16_t _bsel = (uint16_t)((8UL * (uint32_t)F_CPU - (baudval)) / (2UL * (baudval))); \
-            MCTP_USART_BAUD = _bsel; \
-        } while (0)
-    #endif
+    #define USART_RXDATAL  CONCAT2(UDR, SERIAL_UART_INDEX)
+    #define USART_TXDATAL  CONCAT2(UDR, SERIAL_UART_INDEX)
+    #define USART_STATUS   CONCAT3(UCSR, SERIAL_UART_INDEX, A)
+    #define USART_CTRLA    CONCAT3(UCSR, SERIAL_UART_INDEX, A)
+    #define USART_CTRLB    CONCAT3(UCSR, SERIAL_UART_INDEX, B)
+    #define USART_CTRLC    CONCAT3(UCSR, SERIAL_UART_INDEX, C)
+    #define USART_BAUD     CONCAT2(UBRR, SERIAL_UART_INDEX)
+    #define TX_PORT_DIR    CONCAT2(DDR, SERIAL_TX_PORT)
+    #define RX_PORT_DIR    CONCAT2(DDR, SERIAL_RX_PORT)
+    #define SERIAL_BAUD_VAL SERIAL_BAUD
 #endif
 
 /**
@@ -76,60 +74,64 @@
  * platform-specific hardware (serial interfaces, timers, etc.).
  */
 void platform_init(void) {
-#ifdef CPU_CCP
-    /* set peripheral clock to 16 MHz (no divide) */
-    CPU_CCP = CCP_IOREG_gc;
-    CLKCTRL_MCLKCTRLB = 0;
-#endif
-
-    /* Configure USART route if user provided a PORTMUX value */
-#ifdef PORTMUX_USARTROUTEA
-    #ifdef MCTP_PORTMUX_VAL
-        PORTMUX_USARTROUTEA = MCTP_PORTMUX_VAL;
-    #else
-        PORTMUX_USARTROUTEA = (PORTMUX_USART3_ALT1_gc | PORTMUX_USART0_NONE_gc |
-                           PORTMUX_USART1_NONE_gc | PORTMUX_USART2_NONE_gc);
+    #if defined(SERIAL_UART_TYPE_USART_0SERIES)
+        /* set peripheral clock to 16 MHz (no divide) for 0-series */
+        CPU_CCP = CCP_IOREG_gc;
+        CLKCTRL_MCLKCTRLB = 0;
     #endif
-#endif
+
+    /* Configure USART route if required */
+    #ifdef SERIAL_MUXREG
+        #ifdef SERIAL_MUX_ANDMASK
+            SERIAL_MUXREG = (SERIAL_MUXREG & SERIAL_MUX_ANDMASK) | SERIAL_MUX_ORMASK;
+        #else
+            SERIAL_MUXREG = SERIAL_MUX_ORMASK;
+        #endif
+    #endif
 
     /* Configure TX pin as output and RX pin as input using configured port/pin */
-    /* Use concrete register mapping macros from include/generated_serial_config.h */
-    MCTP_TX_PORT_DIR |= (1 << MCTP_UART_TX_PIN);
-    MCTP_RX_PORT_DIR &= ~(1 << MCTP_UART_RX_PIN);
+    TX_PORT_DIR |= (1 << SERIAL_TX_PIN);
+    RX_PORT_DIR &= ~(1 << SERIAL_RX_PIN);
 
-#if defined(MCTP_USART_0SERIES)
-    /* 0-series: use io-header enum values for frame format */
-    MCTP_USART_CTRLC = (USART_CHSIZE_8BIT_gc) | (USART_PMODE_DISABLED_gc) |
-                      (USART_SBMODE_1BIT_gc) | (USART_CMODE_ASYNCHRONOUS_gc);
-#elif defined(USART_CHSIZE_8BIT_gc)
-    /* Frame format and mode (8N1, async) */
-    MCTP_USART_CTRLC = (USART_CHSIZE_8BIT_gc) | (USART_PMODE_DISABLED_gc) |
-                     (USART_SBMODE_1BIT_gc) | (USART_CMODE_ASYNCHRONOUS_gc);
-#else
-    /* Frame format and mode (8N1, async) - prefer classic bit names if present */
-    #if defined(UCSZ1)
-        MCTP_USART_CTRLC = (1 << UCSZ1) | (1 << UCSZ0);
-    #elif defined(UCSZ01)
-        MCTP_USART_CTRLC = (1 << UCSZ01) | (1 << UCSZ00); /* 8-bit data */
+    /* Configure frame format and mode. Use token-pasted `USART_*` aliases
+    * derived from `SERIAL_UART_INDEX` (and header enums when available). */
+    #if defined(SERIAL_UART_TYPE_USART_0SERIES) || defined(USART_CHSIZE_8BIT_gc)
+        /* 0-series or headers providing convenient enums: write typical 8N1 async */
+        USART_CTRLC = (USART_CHSIZE_8BIT_gc) | (USART_PMODE_DISABLED_gc) |
+                    (USART_SBMODE_1BIT_gc) | (USART_CMODE_ASYNCHRONOUS_gc);
     #else
-        MCTP_USART_CTRLC = 0; /* unknown; leave as-is */
+        /* Fallback to classic bit-field names where available, else clear */
+        #if defined(UCSZ1) && defined(UCSZ0)
+            USART_CTRLC = (1 << UCSZ1) | (1 << UCSZ0);
+        #elif defined(UCSZ01) && defined(UCSZ00)
+            USART_CTRLC = (1 << UCSZ01) | (1 << UCSZ00);
+        #else
+            USART_CTRLC = 0;
+        #endif
     #endif
-#endif
 
-    /* Compute BAUD using board-configured abstraction. */
-    const uint32_t baud = MCTP_BAUD;
-    MCTP_USART_SET_BAUD(baud);
+    /* Compute BAUD using board-specific method. */
+    const uint32_t baud = SERIAL_BAUD_VAL;
+    #if defined(SERIAL_UART_TYPE_USART_0SERIES)
+        /* DA/DB style BAUD register (0-series) */
+        uint16_t _bsel = (uint16_t)((8UL * (uint32_t)F_CPU) / (2UL * (baud)));
+        USART_BAUD = _bsel;
+    #else
+        /* Classic AVR UBRR calculation: compute UBRR and write it into UBRRn. */
+        uint16_t _ubrr = (uint16_t)(((uint32_t)F_CPU / (16UL * (uint32_t)(baud))) - 1UL);
+        USART_BAUD = _ubrr;
+    #endif
 
     /* Enable TX/RX */
-#ifdef USART_RXEN_bm
-    MCTP_USART_CTRLB = USART_RXEN_bm | USART_TXEN_bm;
-#elif defined(RXEN)
-    MCTP_USART_CTRLB = (1 << RXEN) | (1 << TXEN);
-#elif defined(RXEN0)
-    MCTP_USART_CTRLB = (1 << RXEN0) | (1 << TXEN0);
-#else
-    MCTP_USART_CTRLB = 0;
-#endif
+    #ifdef USART_RXEN_bm
+        USART_CTRLB = USART_RXEN_bm | USART_TXEN_bm;
+    #elif defined(RXEN)
+        USART_CTRLB = (1 << RXEN) | (1 << TXEN);
+    #elif defined(RXEN0)
+        USART_CTRLB = (1 << RXEN0) | (1 << TXEN0);
+    #else
+        USART_CTRLB = 0;
+    #endif
 }
 
 /**
@@ -140,11 +142,11 @@ void platform_init(void) {
 uint8_t platform_serial_has_data(void) {
     /* RX Complete flag in STATUS register indicates received data */
     #ifdef USART_RXCIF_bm        
-        return (MCTP_USART_STATUS & USART_RXCIF_bm) ? 1 : 0;
+        return (USART_STATUS & USART_RXCIF_bm) ? 1 : 0;
     #elif defined(RXC)
-        return (MCTP_USART_STATUS & (1 << RXC)) ? 1 : 0;
+        return (USART_STATUS & (1 << RXC)) ? 1 : 0;
     #elif defined(RXC0)
-        return (MCTP_USART_STATUS & (1 << RXC0)) ? 1 : 0;
+        return (USART_STATUS & (1 << RXC0)) ? 1 : 0;
     #else
         return 0;
     #endif
@@ -158,21 +160,21 @@ uint8_t platform_serial_has_data(void) {
 uint8_t platform_serial_read_byte(void) {
     /* Wait for data to be available, then read the low data register */
     #ifdef USART_RXCIF_bm
-    while (!(MCTP_USART_STATUS & USART_RXCIF_bm)) {
+    while (!(USART_STATUS & USART_RXCIF_bm)) {
             ;
         }
     #elif defined(RXC)
-        while (!(MCTP_USART_STATUS & (1 << RXC))) {
+        while (!(USART_STATUS & (1 << RXC))) {
             ;
         }
     #elif defined(RXC0)
-        while (!(MCTP_USART_STATUS & (1 << RXC0))) {
+        while (!(USART_STATUS & (1 << RXC0))) {
             ;
         }
     #else
         ;
     #endif
-    uint8_t b = (uint8_t)MCTP_USART_RXDATAL;
+    uint8_t b = (uint8_t)USART_RXDATAL;
     return (uint8_t)b;
 }
 
@@ -184,21 +186,21 @@ uint8_t platform_serial_read_byte(void) {
 void platform_serial_write_byte(uint8_t b) {   
     /* Wait until Data Register Empty, then write */
     #ifdef USART_DREIF_bm
-        while (!(MCTP_USART_STATUS & USART_DREIF_bm)) {
+        while (!(USART_STATUS & USART_DREIF_bm)) {
             ;
         }
     #elif defined(UDRE)
-        while (!(MCTP_USART_STATUS & (1 << UDRE))) {
+        while (!(USART_STATUS & (1 << UDRE))) {
             ;
         }
     #elif defined(UDRE0)
-        while (!(MCTP_USART_STATUS & (1 << UDRE0))) {
+        while (!(USART_STATUS & (1 << UDRE0))) {
             ;
         }
     #else
         ;
     #endif
-    MCTP_USART_TXDATAL = b;
+    USART_TXDATAL = b;
 }
 
 /**
@@ -208,11 +210,11 @@ void platform_serial_write_byte(uint8_t b) {
  */
 uint8_t platform_serial_can_write(void) {
     #ifdef USART_DREIF_bm
-        return (MCTP_USART_STATUS & USART_DREIF_bm) ? 1 : 0;
+        return (USART_STATUS & USART_DREIF_bm) ? 1 : 0;
     #elif defined(UDRE)
-        return (MCTP_USART_STATUS & (1 << UDRE)) ? 1 : 0;
+        return (USART_STATUS & (1 << UDRE)) ? 1 : 0;
     #elif defined(UDRE0)
-        return (MCTP_USART_STATUS & (1 << UDRE0)) ? 1 : 0;
+        return (USART_STATUS & (1 << UDRE0)) ? 1 : 0;
     #else
         return 0;
     #endif

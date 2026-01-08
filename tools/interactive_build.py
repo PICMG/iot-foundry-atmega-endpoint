@@ -29,9 +29,6 @@ DEFAULTS = {
     'PROG_BAUD': '115200',
 }
 
-COMMON_PROGS = ['arduino', 'stk500v1', 'stk500v2', 'usbasp', 'usbtiny', 'avrisp', 'avr109']
-
-
 def load_existing(path):
     vals = {}
     if not os.path.exists(path):

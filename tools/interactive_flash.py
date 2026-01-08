@@ -11,7 +11,7 @@ import re
 ROOT = os.path.abspath(os.path.dirname(os.path.dirname(__file__)))
 OUT = os.path.join(ROOT, 'include', 'last_build.make')
 
-COMMON_PROGS = ['arduino', 'stk500v1', 'stk500v2', 'usbasp', 'usbtiny', 'avrisp', 'avr109']
+COMMON_PROGS = ['arduino', 'stk500v1', 'stk500v2', 'usbasp', 'usbtiny', 'avrisp', 'avr109', 'jtag2updi']
 
 
 def load_existing(path):
