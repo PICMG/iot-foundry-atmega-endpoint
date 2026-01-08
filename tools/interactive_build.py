@@ -76,29 +76,42 @@ def load_config():
 
 def mcus_from_config(cfg):
     s = set()
-    for entry in cfg:
-        for p in entry.get('part_numbers', []):
-            s.add(p)
+    # New shape: top-level object with classic_uarts and zero_series_uarts
+    if isinstance(cfg, dict):
+        for key in ('classic_uarts', 'zero_series_uarts'):
+            for entry in cfg.get(key, []):
+                for p in entry.get('included_parts', []):
+                    s.add(p)
+    else:
+        for entry in cfg:
+            for p in entry.get('part_numbers', []):
+                s.add(p)
     return sorted(s)
 
 
 def serial_options_for_mcu(cfg, mcu):
     opts = []
-    for entry in cfg:
-        for sp in entry.get('serial_ports', []):
-            if 'included_parts' in sp:
-                # match MCU case-insensitively (users may enter lowercase)
-                matched = any(p.lower() == mcu.lower() for p in sp['included_parts'])
-                if not matched:
-                    continue
-                # Create a label that includes the name and a brief ports summary
-                ports = sp.get('ports', [])
-                if len(ports) == 1:
-                    p = ports[0]
-                    label = f"{sp.get('name')} (tx {p.get('txport')}{p.get('txpin')} rx {p.get('rxport')}{p.get('rxpin')})"
-                else:
-                    label = f"{sp.get('name')} ({len(ports)} pin options)"
-                opts.append({'name': sp.get('name'), 'label': label, 'entry': sp})
+    entries = []
+    if isinstance(cfg, dict):
+        entries = cfg.get('classic_uarts', []) + cfg.get('zero_series_uarts', [])
+    else:
+        for entry in cfg:
+            entries += entry.get('serial_ports', [])
+
+    for sp in entries:
+        if 'included_parts' in sp:
+            # match MCU case-insensitively (users may enter lowercase)
+            matched = any(p.lower() == mcu.lower() for p in sp['included_parts'])
+            if not matched:
+                continue
+            # Create a label that includes the name and a brief ports summary
+            ports = sp.get('ports', [])
+            if len(ports) == 1:
+                p = ports[0]
+                label = f"{sp.get('name')} (tx {p.get('txport')}{p.get('txpin')} rx {p.get('rxport')}{p.get('rxpin')})"
+            else:
+                label = f"{sp.get('name')} ({len(ports)} pin options)"
+            opts.append({'name': sp.get('name'), 'label': label, 'entry': sp})
     # collapse by name preferring first occurrence
     seen = {}
     out = []

@@ -30,13 +30,21 @@ def parse_int(s):
 def find_entries_for_mcu(cfg, mcu):
     mcu_u = mcu.upper()
     entries = []
-    for group in cfg:
-        for entry in group.get('serial_ports', []):
+    def collect_from_list(lst):
+        for entry in lst:
             parts = entry.get('included_parts') or []
             for p in parts:
                 if p.upper() == mcu_u:
                     entries.append(entry)
                     break
+
+    # Support both new object shape and legacy array-of-groups
+    if isinstance(cfg, dict):
+        collect_from_list(cfg.get('classic_uarts', []))
+        collect_from_list(cfg.get('zero_series_uarts', []))
+    else:
+        for group in cfg:
+            collect_from_list(group.get('serial_ports', []))
     return entries
 
 

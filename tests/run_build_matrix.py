@@ -26,18 +26,24 @@ def load_config():
 
 def enumerate_combinations(cfg):
     combos = []
-    for group in cfg:
-        for entry in group.get('serial_ports', []):
-            name = entry.get('name')
-            parts = entry.get('included_parts') or []
-            ports = entry.get('ports') or []
-            nports = max(1, len(ports))
-            for p in parts:
-                if ports:
-                    for idx in range(len(ports)):
-                        combos.append({'mcu': p, 'uart': name, 'pin_idx': idx, 'entry': entry})
-                else:
-                    combos.append({'mcu': p, 'uart': name, 'pin_idx': None, 'entry': entry})
+    # Accept either new object shape or legacy array-of-groups
+    entries = []
+    if isinstance(cfg, dict):
+        entries = cfg.get('classic_uarts', []) + cfg.get('zero_series_uarts', [])
+    else:
+        for group in cfg:
+            entries += group.get('serial_ports', [])
+
+    for entry in entries:
+        name = entry.get('name')
+        parts = entry.get('included_parts') or []
+        ports = entry.get('ports') or []
+        for p in parts:
+            if ports:
+                for idx in range(len(ports)):
+                    combos.append({'mcu': p, 'uart': name, 'pin_idx': idx, 'entry': entry})
+            else:
+                combos.append({'mcu': p, 'uart': name, 'pin_idx': None, 'entry': entry})
     return combos
 
 
