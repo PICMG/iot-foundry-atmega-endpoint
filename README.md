@@ -13,57 +13,134 @@ The code and build process in this project relies upon the template code found i
 
 This repository is part of the IoTFoundry family of open source projects.  For more information about IoTFoundry, please visit the main IoTFoundry site at: [https://picmg.github.io/iot-foundry/](https://picmg.github.io/iot-foundry/)
 
-## Repository Resources
-* .\src - the source files for implementing the mctp endpoint
-* .\include - the header files
-
 ## System Requirements
 The following are system requirements for buidling/testing teh code in this library.
 
 - Linux with the gnu toolchain and make tools installed.
 - An atmega-based microcontroller board that is programmable using avrdude.
 
-# Environment Installation
+## Repository Resources
+
+- `configurations.json` — A json structure that shows all serial port and MCU mappings supported by this project.  Contents of this file drive the interactive build process and the configuration header file generator (`tools/generate_serial_config.py`).
+- `CONRIBUTING.md` — instructions for contributing to this project.
+- `LICENSE` — The license for this project (MIT)
+- `Makefile` — build, generation and flash recipes.
+- `README.md` — this document.
+- `include/` — public headers and generator output (see `include/generated_serial_config.h`).
+  - `include/core` — (template core includes)
+- `src/` — application and platform C sources
+  - `src/core/` — (template core sources).
+- `tools/` — helper scripts used by the build and flash workflows.
+- `tests/` — test scripts and requirements for host-side tests and tooling.
+
+## Environment Installation
+
+Update your package index and install the AVR toolchain and `avrdude` with your distribution package manager. The packages below provide the `avr-gcc` compiler, AVR libc headers and runtime, and `avrdude` for programming.
+
+### Debian / Ubuntu
+
+Install the distribution-maintained AVR toolchain and `avrdude` with `apt`. This is the simplest approach on Debian-family systems and is sufficient for most development and flashing tasks:
 
 ```bash
-# update the software registry
-sudo apt-get --assume-yes update
-sudo apt-get --assume-yes upgrade
-```
+sudo apt-get update
+sudo apt-get install -y gcc-avr binutils-avr avr-libc avrdude make python3-pip
 
-```bash
-# install avr build tools
-# example - replace with the actual latest URL
-wget https://<microchip_url>/avr8-gnu-toolchain-<VERSION>-linux.any.x86_64.tar.gz -O /tmp/avr8-toolchain.tar.gz
-
-cd /tmp
-tar xzf /tmp/avr8-toolchain.tar.gz
-# this creates a directory like avr8-gnu-toolchain-<VERSION>
-sudo mv avr8-gnu-toolchain-<VERSION> /usr/local/avr8-gnu-toolchain-<VERSION>
-
-sudo ln -s /usr/local/avr8-gnu-toolchain-<VERSION>/bin/* /usr/local/bin/ || true
-hash -r
-
-which avr-gcc
 avr-gcc --version
-# confirm device specs for atmega4809 exist
-grep -R "atmega4809" /usr/local/avr8-gnu-toolchain-<VERSION> || true
+avrdude -v
 ```
+
+### Fedora / RHEL (dnf)
+
+Use `dnf` to install equivalent packages on Fedora or RHEL derivatives:
 
 ```bash
-# patch and build gdb for avr
-sudo apt-get --assume-yes --purge remove gdb-avr
-wget ftp.gnu.org/gnu/gdb/gdb-8.1.1.tar.xz
-tar xf gdb-8.1.1.tar.xz
-cd gdb-8.1.1
-perl -i -0pe 's/  ULONGEST addr = unpack_long \(type, buf\);\R\R  return avr_make_saddr \(addr\);\R/  ULONGEST addr = unpack_long (type, buf);\n\n  if (TYPE_DATA_SPACE (type))\n    return avr_make_saddr (addr);\n  else\n    return avr_make_iaddr (addr);\n/' gdb/avr-tdep.c
-./configure --prefix=/usr --target=avr
-make
-sudo make install
-cd ~
+sudo dnf install -y avr-gcc avr-binutils avr-libc avrdude make python3-pip
+
+avr-gcc --version
+avrdude -v
 ```
 
-# Building
+### Arch Linux
+
+On Arch, install the toolchain from the main repositories with `pacman`:
+
+```bash
+sudo pacman -S --needed avr-gcc avr-binutils avr-libc avrdude make python-pip
+
+avr-gcc --version
+avrdude -v
+```
+
+## Build Flow
+
+This project contains several makefile recepies to help build IoTFoundry endpoints for a variety of ATmega target devices.  To make selection of the target easy, the build process supports an an interactive mode.
+
+### Interactive Builds
+For first-time builds or when changing board configurations, run `make interactive`. This guides you through selecting the microprocessor type (`MCU`), the desired serial baud rate (`SERIAL_BAUD`), and optional UART/pin choices.  Your selections converted to a header file (to direct code compilation) and your configuration is stored for subsequent builds.
+
+to run in interactive mode, invoke the following command:
+
+```bash
+make interactive
+```
+
+### Build Using Defaults
+Once the build settings have been configured using `make interactive`, subsequent builds may be completed using the previous settings.  This is accomplished with a simple  'make' command:
+
+```bash
+make
+```
+
+### Overriding Build Defaults (Advanced)
+For automation purposes, it may be useful to override (or assign) default build parameters.  To do this, each parameter to be overridden is passed to the make file like this:
+
+```
+make MCU=ATmega328P SERIAL_BAUD=115200 F_CPU=8000000
+```
+
+The table below lists all the build override paramters, and how you may obtain acceptable values for them from `configurations.json`
+
+| Name | Description |
+|---|---|
+| `MCU` | Target part name that must match a `part_numbers` entry in `configurations.json` (case-insensitive). Open `configurations.json`, find the entry whose `part_numbers` list contains your device (for example `ATmega328P`), and use that exact part string. |
+| `SERIAL_BAUD` | Numeric UART baud rate used by the firmware (e.g., `115200`). The generator uses it together with `F_CPU` to compute baud register values. |
+| `SERIAL_UART` | Select the serial interface by the `name` field from the matching MCU entry's `serial_ports` array in `configurations.json` (for example `USART1`). Use that `name`. |
+| `SERIAL_PIN_OPTION` | When the chosen `serial_ports` entry contains a `ports` array, this is the zero-based index into that array selecting the TX/RX pin mapping. Inspect the `ports` array for the chosen `serial_ports` entry in `configurations.json` and use `0`, `1`, etc. to pick the mapping. |
+| `F_CPU` | CPU clock frequency used to calculate baud registers (e.g., `16000000` or `8000000`).  |
+
+## Programming Target Devices
+This project contains makefile recepies to help program IoTFoundry endpoints.  To make programming of the target easy, the build process supports an an interactive mode.
+
+### Interactive Programming
+For first-time programming or when changing a program target, run `make flash_interactive`. This guides you through selecting target device, programmer, and programming speed. Your selections are stored for subsequent programming sessions.
+
+Invoke interactive programming using the following make command:
+
+```bash
+make flash_interactive
+```
+
+### Programming Using Defaults
+Once the programming settings have been configured using `make flash_interactive`, subsequent programming sessions may be completed using the previous settings.  This is accomplished with the 'make flash' command:
+
+```bash
+make flash
+```
+
+### Overriding Programmer Defaults (Advanced)
+For automation purposes, it may be useful to override (or assign) default programming parameters.  To do this, each parameter to be overridden is passed to the make file like this:
+
+```bash
+make flash PROG=jtag2updi PORT=/dev/ttyACM0 PROG_BAUD=115200
+```
+The following table shows parameters that may be overridden.
+
+| Name | Description |
+|---|---|
+| `PROG` | avrdude programmer type (e.g., `arduino`, `stk500v1`, `usbasp`,`jtag2updi`). Choose a value supported by `avrdude` for your target hardware. |
+| `PORT` | Host serial device used for flashing (e.g., `/dev/ttyACM0`, `/dev/ttyUSB0`).  |
+| `PROG_BAUD` | Baud rate passed to `avrdude` for the chosen programmer (default `115200`).  |
+| `MCU` | MCU used for the build/flash. `make flash` prefers `include/last_mcu` (written by the generator) but you can override with `MCU=<part>` on the command line; the part should match a `part_numbers` entry in `configurations.json`. |
 
 ## Board Configuration
 
@@ -183,18 +260,8 @@ Two common targets and how to configure them:
 make MCU=ATmega328P SERIAL_BAUD=115200
 ```
 
-# Eliminating False Linter Errors
-This project generates a `compile_commands.json` to help IDEs (VS Code C/C++ extension) match your build flags and include paths.
-
-To regenerate:
-
-```bash
-make generate-compile-commands
-```
-
-VS Code tip:
-- Select the `AVR` configuration in the C/C++ extension and ensure `compile_commands.json` is selected (the workspace `.vscode/c_cpp_properties.json` already references it).
-- Reload the window or restart the C/C++ server if IntelliSense still reports missing AVR symbols.
+# Editor integration notes
+If your editor expects a `compile_commands.json` compilation database for IDE features (IntelliSense, clangd, etc.), generate one externally from your build system or use your editor's project settings. This repository no longer generates `compile_commands.json` automatically.
 
 # Running device tests
 

@@ -4,11 +4,13 @@
 *.hex
 *.o
 
-reports/
-tests/__pycache__/
 include/generated_serial_config.h
 include/last_fcpu
+include/last_build.make
 include/last_mcu
 include/core/
+reports/
 src/core/
+tests/__pycache__/
+tools/__pycache__/
 

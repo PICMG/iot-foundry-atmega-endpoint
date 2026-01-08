@@ -1,6 +1,11 @@
 /**
  * @file platform.c
  * @brief Platform API shim layer for ATMEGA microcontrollers.
+ * 
+ * Provides implementations of platform-specific functions for serial I/O.  Initialization
+ * is performed based on generated_serial_config.h settings.  Macro switches allow
+ * selection of different baud rate calculation methods and uart configuration
+ * depending on the target MCU family.
  *
  * @author Douglas Sandy
  *
@@ -29,62 +34,40 @@
 #include "core/platform.h"
 #include "generated_serial_config.h"
 
-/* Baud helper implementations live here. Implement the common cases:
- * DA/DB style BAUD register and classic UBRR. Boards may override these
+/* Baud helper implementations:
+ * DA/DB style BAUD register and classic UBRR. Builds may override these
  * by defining MCTP_USART_SET_BAUD or MCTP_USART_WRITE_UBRR. */
 #if MCTP_BAUD_MODE == MCTP_BAUD_MODE_DA_DB
-#ifndef MCTP_USART_SET_BAUD
-#define MCTP_USART_SET_BAUD(baudval) \
-    do { \
-        uint16_t _bsel = (uint16_t)((8UL * (uint32_t)F_CPU - (baudval)) / (2UL * (baudval))); \
-        MCTP_USART_BAUD = _bsel; \
-    } while (0)
-#endif
-#
-/* Token-paste and register concatenation helpers (local to platform.c).
- * These are only needed when platform code needs to form register names
- * from macros; keeping them local avoids polluting the generated header.
- */
-#define CAT(a,b) a##b
-#define CAT2(a,b) CAT(a,b)
-#define PORT_OF(p) CAT2(PORT, p)
-#define DIRSET_OF(p) CAT2(p, .DIRSET)
-#define DIRCLR_OF(p) CAT2(p, .DIRCLR)
-#define PIN_OF(p) CAT2(PIN, p)
-#define USART_OF(n) CAT2(USART, n)
-
-/* Generic register concatenation helper: REG(USART_OF(MCTP_USART_NUM), STATUS)
- * -> USART3_STATUS */
-#define REG2(a,b) a##_##b
-#define REG(a,b) REG2(a,b)
+    #ifndef MCTP_USART_SET_BAUD
+    #define MCTP_USART_SET_BAUD(baudval) \
+        do { \
+            uint16_t _bsel = (uint16_t)((8UL * (uint32_t)F_CPU - (baudval)) / (2UL * (baudval))); \
+            MCTP_USART_BAUD = _bsel; \
+        } while (0)
+    #endif
 #elif MCTP_BAUD_MODE == MCTP_BAUD_MODE_CLASSIC
-#ifndef MCTP_USART_WRITE_UBRR
-/* Default writer: place UBRR value into MCTP_USART_BAUD alias. Boards
- * targeting classic AVRs should provide a proper MCTP_USART_WRITE_UBRR. */
-#define MCTP_USART_WRITE_UBRR(v) do { MCTP_USART_BAUD = (v); } while (0)
-#endif
-#ifndef MCTP_USART_SET_BAUD
-#define MCTP_USART_SET_BAUD(baudval) \
-    do { \
-        uint16_t _ubrr = (uint16_t)(((uint32_t)F_CPU / (16UL * (uint32_t)(baudval))) - 1UL); \
-        MCTP_USART_WRITE_UBRR(_ubrr); \
-    } while (0)
-#endif
+    #ifndef MCTP_USART_WRITE_UBRR
+        /* Default writer: place UBRR value into MCTP_USART_BAUD alias. Boards
+        * targeting classic AVRs should provide a proper MCTP_USART_WRITE_UBRR. */
+        #define MCTP_USART_WRITE_UBRR(v) do { MCTP_USART_BAUD = (v); } while (0)
+    #endif
+    #ifndef MCTP_USART_SET_BAUD
+        #define MCTP_USART_SET_BAUD(baudval) \
+            do { \
+                uint16_t _ubrr = (uint16_t)(((uint32_t)F_CPU / (16UL * (uint32_t)(baudval))) - 1UL); \
+                MCTP_USART_WRITE_UBRR(_ubrr); \
+            } while (0)
+    #endif
 #else
-/* AUTO or unknown: fallback to DA/DB formula */
-#ifndef MCTP_USART_SET_BAUD
-#define MCTP_USART_SET_BAUD(baudval) \
-    do { \
-        uint16_t _bsel = (uint16_t)((8UL * (uint32_t)F_CPU - (baudval)) / (2UL * (baudval))); \
-        MCTP_USART_BAUD = _bsel; \
-    } while (0)
+    /* AUTO or unknown: fallback to DA/DB formula */
+    #ifndef MCTP_USART_SET_BAUD
+    #define MCTP_USART_SET_BAUD(baudval) \
+        do { \
+            uint16_t _bsel = (uint16_t)((8UL * (uint32_t)F_CPU - (baudval)) / (2UL * (baudval))); \
+            MCTP_USART_BAUD = _bsel; \
+        } while (0)
+    #endif
 #endif
-#endif
-
-/* Platform configuration is provided by include/generated_serial_config.h
- * which exposes MCTP_USART_NUM, MCTP_UART_TX_PORT, MCTP_UART_TX_PIN,
- * MCTP_UART_RX_PORT, MCTP_UART_RX_PIN, and MCTP_BAUD. MCU and F_CPU may
- * be set via the Makefile or -D flags in the build. */
 
 /**
  * @brief Initialize platform hardware.
@@ -124,13 +107,13 @@ void platform_init(void) {
                      (USART_SBMODE_1BIT_gc) | (USART_CMODE_ASYNCHRONOUS_gc);
 #else
     /* Frame format and mode (8N1, async) - prefer classic bit names if present */
-#if defined(UCSZ1)
-    MCTP_USART_CTRLC = (1 << UCSZ1) | (1 << UCSZ0);
-#elif defined(UCSZ01)
-    MCTP_USART_CTRLC = (1 << UCSZ01) | (1 << UCSZ00); /* 8-bit data */
-#else
-    MCTP_USART_CTRLC = 0; /* unknown; leave as-is */
-#endif
+    #if defined(UCSZ1)
+        MCTP_USART_CTRLC = (1 << UCSZ1) | (1 << UCSZ0);
+    #elif defined(UCSZ01)
+        MCTP_USART_CTRLC = (1 << UCSZ01) | (1 << UCSZ00); /* 8-bit data */
+    #else
+        MCTP_USART_CTRLC = 0; /* unknown; leave as-is */
+    #endif
 #endif
 
     /* Compute BAUD using board-configured abstraction. */
