@@ -17,7 +17,6 @@
                 }
             ],
             "registers": [ "UDR0", "UCSR0A", "UCSR0B", "UCSR0C", "UBRR0" ],
-            "baud_equation": "BAUD = fclk / (16*(BD+1))",
             "baud_registers": [
                 {
                     "register": "UBRR0",
@@ -32,8 +31,7 @@
             "name": "USART0",
             "type": "USART_CLASSIC",
             "ports": [ { "txport": "E", "txpin": 1, "rxport": "E", "rxpin": 0 } ],
-            "registers": [ "UDR0", "UCSR0A", "UCSR0B", "UCSR0C", "UBRR0" ],
-            "baud_equation": "BAUD = fclk / (16*(BD+1))",
+                "registers": [ "UDR0", "UCSR0A", "UCSR0B", "UCSR0C", "UBRR0" ],
             "baud_registers": [ { "register": "UBRR0", "bits": "[7:0]", "field_name": "BD", "field_bits": "[7:0]" } ]
         },
         {
@@ -41,8 +39,7 @@
             "name": "USART1",
             "type": "USART_CLASSIC",
             "ports": [ { "txport": "B", "txpin": 3, "rxport": "B", "rxpin": 4 } ],
-            "registers": [ "UDR1", "UCSR1A", "UCSR1B", "UCSR1C", "UBRR1" ],
-            "baud_equation": "BAUD = fclk / (16*(BD+1))",
+                "registers": [ "UDR1", "UCSR1A", "UCSR1B", "UCSR1C", "UBRR1" ],
             "baud_registers": [ { "register": "UBRR1", "bits": "[7:0]", "field_name": "BD", "field_bits": "[7:0]" } ]
         },
         {
@@ -50,8 +47,7 @@
             "name": "USART1",
             "type": "USART_CLASSIC",
             "ports": [ { "txport": "D", "txpin": 3, "rxport": "D", "rxpin": 2 } ],
-            "registers": [ "UDR1", "UCSR1A", "UCSR1B", "UCSR1C", "UBRR1" ],
-            "baud_equation": "BAUD = fclk / (16*(BD+1))",
+                "registers": [ "UDR1", "UCSR1A", "UCSR1B", "UCSR1C", "UBRR1" ],
             "baud_registers": [ { "register": "UBRR1", "bits": "[7:0]", "field_name": "BD", "field_bits": "[7:0]" } ]
         },
         {
@@ -59,8 +55,7 @@
             "name": "USART2",
             "type": "USART_CLASSIC",
             "ports": [ { "txport": "E", "txpin": 3, "rxport": "E", "rxpin": 2 } ],
-            "registers": [ "UDR2", "UCSR2A", "UCSR2B", "UCSR2C", "UBRR2" ],
-            "baud_equation": "BAUD = fclk / (16*(BD+1))",
+                "registers": [ "UDR2", "UCSR2A", "UCSR2B", "UCSR2C", "UBRR2" ],
             "baud_registers": [ { "register": "UBRR2", "bits": "[7:0]", "field_name": "BD", "field_bits": "[7:0]" } ]
         }
     ],
@@ -79,7 +74,6 @@
                 "CTRLA0", "CTRLB0", "CTRLC0", "BAUD0", "CTRLD0",
                 "DBGCTRL0", "EVCTRL0", "TXPLCTRL0", "RXPLCTRL"
             ],
-            "baud_equation": "BAUD = fclk / (2 * BD)",
             "baud_registers": [ { "register": "BAUD0", "bits": "[15:6]", "field_name": "BD", "field_bits": "[7:0]" } ]
         },
         {
@@ -90,12 +84,11 @@
                 { "txport": "C", "txpin": 0, "rxport": "C", "rxpin": 1, "muxreg": "USARTROUTEA", "andmask": "11110011", "ormask": "00000000" },
                 { "txport": "C", "txpin": 4, "rxport": "C", "rxpin": 5, "muxreg": "USARTROUTEA", "andmask": "11110011", "ormask": "00000100" }
             ],
-            "registers": [
-                "RXDATAL1", "RXDATAH1", "TXDATAL1", "TXDATAH1", "STATUS1",
-                "CTRLA1", "CTRLB1", "CTRLC1", "BAUD1", "CTRLD1",
-                "DBGCTRL1", "EVCTRL1", "TXPLCTRL1", "RXPLCTRL1"
-            ],
-            "baud_equation": "BAUD = fclk / (2 * BD)",
+                "registers": [
+                    "RXDATAL1", "RXDATAH1", "TXDATAL1", "TXDATAH1", "STATUS1",
+                    "CTRLA1", "CTRLB1", "CTRLC1", "BAUD1", "CTRLD1",
+                    "DBGCTRL1", "EVCTRL1", "TXPLCTRL1", "RXPLCTRL1"
+                ],
             "baud_registers": [ { "register": "BAUD1", "bits": "[15:6]", "field_name": "BD", "field_bits": "[7:0]" } ]
         },
         {
@@ -106,12 +99,11 @@
                 { "txport": "F", "txpin": 0, "rxport": "F", "rxpin": 1, "muxreg": "USARTROUTEA", "andmask": "11001111", "ormask": "00000000" },
                 { "txport": "F", "txpin": 4, "rxport": "F", "rxpin": 5, "muxreg": "USARTROUTEA", "andmask": "11001111", "ormask": "00010000" }
             ],
-            "registers": [
-                "RXDATAL2", "RXDATAH2", "TXDATAL2", "TXDATAH2", "STATUS2",
-                "CTRLA2", "CTRLB2", "CTRLC2", "BAUD2", "CTRLD2",
-                "DBGCTRL2", "EVCTRL2", "TXPLCTRL2", "RXPLCTRL2"
-            ],
-            "baud_equation": "BAUD = fclk / (2 * BD)",
+                "registers": [
+                    "RXDATAL2", "RXDATAH2", "TXDATAL2", "TXDATAH2", "STATUS2",
+                    "CTRLA2", "CTRLB2", "CTRLC2", "BAUD2", "CTRLD2",
+                    "DBGCTRL2", "EVCTRL2", "TXPLCTRL2", "RXPLCTRL2"
+                ],
             "baud_registers": [ { "register": "BAUD2", "bits": "[15:6]", "field_name": "BD", "field_bits": "[7:0]" } ]
         },
         {
@@ -122,12 +114,11 @@
                 { "txport": "B", "txpin": 0, "rxport": "B", "rxpin": 1, "muxreg": "USARTROUTEA", "andmask": "00111111", "ormask": "00000000" },
                 { "txport": "B", "txpin": 4, "rxport": "B", "rxpin": 5, "muxreg": "USARTROUTEA", "andmask": "00111111", "ormask": "01000000" }
             ],
-            "registers": [
-                "RXDATAL3", "RXDATAH3", "TXDATAL3", "TXDATAH3", "STATUS3",
-                "CTRLA3", "CTRLB3", "CTRLC3", "BAUD3", "CTRLD3",
-                "DBGCTRL3", "EVCTRL3", "TXPLCTRL3", "RXPLCTRL3"
-            ],
-            "baud_equation": "BAUD = fclk / (2 * BD)",
+                "registers": [
+                    "RXDATAL3", "RXDATAH3", "TXDATAL3", "TXDATAH3", "STATUS3",
+                    "CTRLA3", "CTRLB3", "CTRLC3", "BAUD3", "CTRLD3",
+                    "DBGCTRL3", "EVCTRL3", "TXPLCTRL3", "RXPLCTRL3"
+                ],
             "baud_registers": [ { "register": "BAUD3", "bits": "[15:6]", "field_name": "BD", "field_bits": "[7:0]" } ]
         }
     ]
