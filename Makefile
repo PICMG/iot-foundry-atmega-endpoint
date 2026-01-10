@@ -96,7 +96,7 @@ download-core:
 sim: include/generated_serial_config.h
 	@echo "Building simulator (host binary): sim_bin"
 	# Build simulator without pulling in full AVR device headers by default.
-	g++ -std=c++17 -g -Og -Iinclude -Iinclude/core -DSIM_HOST -DF_CPU=$(F_CPU) -x c++ $(SRCS) sim/sim_regs.cpp sim/sim_c_api.cpp -o sim_bin || (echo "sim build failed"; exit 1)
+	g++ -std=c++17 -g -Og -Iinclude -Iinclude/core -DSIM_HOST -DF_CPU=$(F_CPU) -x c++ $(SRCS) sim/sim_regs.cpp -o sim_bin || (echo "sim build failed"; exit 1)
 
 # Force target used to ensure generator runs each build (prevents stale header usage)
 FORCE:

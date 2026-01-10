@@ -29,14 +29,11 @@ public:
             std::lock_guard<std::mutex> lk(_cb_mutex);
             cb = _read_cb;
         }
-        if (_name) fprintf(stderr, "sim: operator uint8_t() read %s (has_read_cb=%d)\n", _name, (int)static_cast<bool>(cb));
         if (cb) {
             uint8_t v = cb();
-            if (_name) fprintf(stderr, "sim: operator uint8_t() %s returned 0x%02x\n", _name, (int)v);
             return v;
         }
         uint8_t v = _val.load();
-        if (_name) fprintf(stderr, "sim: operator uint8_t() %s raw=0x%02x\n", _name, (int)v);
         return v;
     }
 
@@ -44,8 +41,6 @@ public:
     Reg8& operator=(uint8_t v) {
         if (_write_cb) _write_cb(v);
         else _val.store(v);
-        if (_name) fprintf(stderr, "sim: write %s <- 0x%02x\n", _name, (int)v);
-        else fprintf(stderr, "sim: write reg[%p] <- 0x%02x\n", (void*)this, (int)v);
         return *const_cast<Reg8*>(this);
     }
 
@@ -54,8 +49,6 @@ public:
         uint8_t nw = old | v;
         if (_write_cb) _write_cb(nw);
         else _val.store(nw);
-        if (_name) fprintf(stderr, "sim: write %s |= 0x%02x -> 0x%02x\n", _name, (int)v, (int)nw);
-        else fprintf(stderr, "sim: or  reg[%p] <- 0x%02x\n", (void*)this, (int)nw);
         return *const_cast<Reg8*>(this);
     }
 
@@ -64,8 +57,6 @@ public:
         uint8_t nw = old & v;
         if (_write_cb) _write_cb(nw);
         else _val.store(nw);
-        if (_name) fprintf(stderr, "sim: write %s &= 0x%02x -> 0x%02x\n", _name, (int)v, (int)nw);
-        else fprintf(stderr, "sim: and reg[%p] <- 0x%02x\n", (void*)this, (int)nw);
         return *const_cast<Reg8*>(this);
     }
 
@@ -100,8 +91,6 @@ public:
     Reg16& operator=(uint16_t v) {
         if (_write_cb) _write_cb(v);
         else _val.store(v);
-        if (_name) fprintf(stderr, "sim: write %s <- 0x%04x\n", _name, (int)v);
-        else fprintf(stderr, "sim: write reg16[%p] <- 0x%04x\n", (void*)this, (int)v);
         return *const_cast<Reg16*>(this);
     }
 

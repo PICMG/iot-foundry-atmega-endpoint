@@ -30,30 +30,54 @@ typedef uint16_t register16_t;
 /* Minimal bit/enum constants used by platform.c. Define only when missing
  * so we don't override device-provided values pulled in via generated_avr_masks.h.
  */
-#ifndef USART_CHSIZE_8BIT_gc
-#define USART_CHSIZE_8BIT_gc (0x03<<0)
-#endif
-#ifndef USART_PMODE_DISABLED_gc
-#define USART_PMODE_DISABLED_gc (0x00<<4)
-#endif
-#ifndef USART_SBMODE_1BIT_gc
-#define USART_SBMODE_1BIT_gc (0x00<<3)
-#endif
-#ifndef USART_CMODE_ASYNCHRONOUS_gc
-#define USART_CMODE_ASYNCHRONOUS_gc (0x00<<6)
-#endif
+#ifdef SERIAL_UART_TYPE_USART_0SERIES
+    #ifndef USART_CHSIZE_8BIT_gc
+    #define USART_CHSIZE_8BIT_gc (0x03<<0)
+    #endif
+    #ifndef USART_PMODE_DISABLED_gc
+    #define USART_PMODE_DISABLED_gc (0x00<<4)
+    #endif
+    #ifndef USART_SBMODE_1BIT_gc
+    #define USART_SBMODE_1BIT_gc (0x00<<3)
+    #endif
+    #ifndef USART_CMODE_ASYNCHRONOUS_gc
+    #define USART_CMODE_ASYNCHRONOUS_gc (0x00<<6)
+    #endif
 
-#ifndef USART_RXEN_bm
-#define USART_RXEN_bm 0x80
-#endif
-#ifndef USART_TXEN_bm
-#define USART_TXEN_bm 0x40
-#endif
-#ifndef USART_DREIF_bm
-#define USART_DREIF_bm 0x20
-#endif
-#ifndef USART_RXCIF_bm
-#define USART_RXCIF_bm 0x80
+    #ifndef USART_RXEN_bm
+    #define USART_RXEN_bm 0x80
+    #endif
+    #ifndef USART_TXEN_bm
+    #define USART_TXEN_bm 0x40
+    #endif
+    #ifndef USART_DREIF_bm
+    #define USART_DREIF_bm 0x20
+    #endif
+    #ifndef USART_RXCIF_bm
+    #define USART_RXCIF_bm 0x80
+    #endif
+#else 
+    #ifndef RXC
+        #define RXC 7
+    #endif
+    #ifndef TXC
+        #define TXC 6
+    #endif
+    #ifndef UDRE
+        #define UDRE 5
+    #endif
+    #ifndef RXEN
+        #define RXEN 4
+    #endif
+    #ifndef TXEN
+        #define TXEN 3
+    #endif
+    #ifndef UCSZ1
+        #define UCSZ1 2
+        #endif
+    #ifndef UCSZ0
+        #define UCSZ0 1
+    #endif
 #endif
 
 #ifdef __cplusplus
