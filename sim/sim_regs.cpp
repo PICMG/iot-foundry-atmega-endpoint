@@ -318,6 +318,7 @@ uint8_t Simulator::ucsra_read_cb(int idx) {
 #define STR_HELPER(x) #x
 #define STR(x) STR_HELPER(x)
 bool Simulator::validate_configuration(int idx) {
+    auto fail = [&](const char *msg)->bool { fprintf(stderr, "sim: validate[%d] fail: %s\n", idx, msg); return false; };
     
     #ifdef SERIAL_UART_TYPE_USART_0SERIES
         // validate the baud rate setting for this usart
@@ -326,10 +327,11 @@ bool Simulator::validate_configuration(int idx) {
         uint16_t baud = reg16(bname).raw();
         uint16_t expected_baud = (uint16_t)((8UL * (uint32_t)GENERATED_F_CPU) / (2UL * (uint32_t)(SERIAL_BAUD)));
         if (baud != expected_baud) {    
-            return false;
+            char buf[64]; snprintf(buf, sizeof(buf), "baud mismatch got %u expected %u", (unsigned)baud, (unsigned)expected_baud);
+            return fail(buf);
         }
 
-        // caluculate the data direction port name for this usart from SERIAL_RX_PORT
+        // calculate the data direction port name for this usart from SERIAL_RX_PORT
         char ddrname[32]; 
         char port_letter[] = STR(SERIAL_RX_PORT);
         snprintf(ddrname, sizeof(ddrname), "PORT%s_DIR", port_letter);
@@ -339,17 +341,17 @@ bool Simulator::validate_configuration(int idx) {
         uint8_t rx_pin_mask = (1 << SERIAL_RX_PIN);
         uint8_t tx_pin_mask = (1 << SERIAL_TX_PIN);
         if ((ddr & (uint8_t)(rx_pin_mask)) != 0) {
-            return false;
+            return fail("RX pin not input (DDR bit set)");
         }
         if ((ddr & (uint8_t)(tx_pin_mask)) == 0) {
-            return false;
+            return fail("TX pin not output (DDR bit clear)");
         }
 
         // validate the pin mux settings for this usart
         char pmname[] = "PORTMUX_USARTROUTEA";
         uint8_t portmux = reg8(pmname).raw();
         if ((portmux & (~SERIAL_MUX_ANDMASK)) != SERIAL_MUX_ORMASK) {
-            return false;
+            return fail("portmux mismatch");
         }
 
         // validate the mode settings for USARTn_CTRLB for this usart
@@ -358,11 +360,11 @@ bool Simulator::validate_configuration(int idx) {
         uint8_t ctrlb = reg8(ctrlbname).raw();
         // validate that RX and TX are enabled
         if ((ctrlb & 0xc0) != 0xc0) {
-            return false;
+            return fail("CTRLB TX/RX not enabled");
         }
         // validate the mode settings for USARTn_CTRLB for this usart
         if ((ctrlb & 0x07) != 0x00) { // standard mode, no multi-processor
-            return false;
+            return fail("CTRLB mode not standard");
         }
 
         // validate the mode settings for USARTn_CTRLC for this usart
@@ -371,14 +373,14 @@ bool Simulator::validate_configuration(int idx) {
         uint8_t ctrlc = reg8(ctrlcname).raw();
         // for simplicity, assume that valid setting is asynchronous mode, 8-n-1
         if ((ctrlc  != 0x03)) { // 8N1 async
-            return false;
+            return fail("CTRLC not 8N1");
         }
 
-        // validate that the clock precale is set to no division
+        // validate that the clock prescale is set to no division
         char clkname[] = "CLKCTRL_MCLKCTRLB";
         uint8_t clk = reg8(clkname).raw();
         if (clk != 0) {
-            return false;
+            return fail("CLK prescaler non-zero");
         }
     #else
         // validate the baud rate setting for this usart
@@ -387,10 +389,11 @@ bool Simulator::validate_configuration(int idx) {
         uint16_t baud = reg16(bname).raw();
         uint16_t expected_baud = (uint16_t)(((uint32_t)GENERATED_F_CPU) / (16 * (uint32_t)(SERIAL_BAUD)))-1;
         if (baud != expected_baud) {    
-            return false;
+            char buf[64]; snprintf(buf, sizeof(buf), "baud mismatch got %u expected %u", (unsigned)baud, (unsigned)expected_baud);
+            return fail(buf);
         }
 
-        // caluculate the data direction port name for this usart from SERIAL_RX_PORT
+        // calculate the data direction port name for this usart from SERIAL_RX_PORT
         char ddrname[32]; 
         char port_letter[] = STR(SERIAL_RX_PORT);
         snprintf(ddrname, sizeof(ddrname), "PORT%s_DIR", port_letter);
@@ -400,10 +403,10 @@ bool Simulator::validate_configuration(int idx) {
         uint8_t rx_pin_mask = (1 << SERIAL_RX_PIN);
         uint8_t tx_pin_mask = (1 << SERIAL_TX_PIN);
         if ((ddr & (uint8_t)(rx_pin_mask)) != 0) {
-            return false;
+            return fail("RX pin not input (DDR bit set)");
         }
         if ((ddr & (uint8_t)(tx_pin_mask)) == 0) {
-            return false;
+            return fail("TX pin not output (DDR bit clear)");
         }
 
         // validate the mode settings for UCSRnA for this usart
@@ -412,7 +415,7 @@ bool Simulator::validate_configuration(int idx) {
         uint8_t ctrla = reg8(ctrlaname).raw();
         // validate that normal speed and no multi-processor RX and TX are enabled
         if ((ctrla & 0x3) != 0) {
-            return false;
+            return fail("CTRLA invalid (speed/multi)");
         }
 
         // validate the mode settings for UCSRnB for this usart
@@ -421,7 +424,7 @@ bool Simulator::validate_configuration(int idx) {
         uint8_t ctrlb = reg8(ctrlbname).raw();
         // validate that RX and TX are enabled
         if ((ctrlb & 0x1c) != 0x18) {
-            return false;
+            return fail("CTRLB RX/TX not enabled");
         }
 
         // validate the mode settings for UCSRnC for this usart
@@ -430,7 +433,7 @@ bool Simulator::validate_configuration(int idx) {
         uint8_t ctrlc = reg8(ctrlcname).raw();
         // for simplicity, assume that valid setting is asynchronous mode, 8-n-1
         if (ctrlc  != 0x06) { // 8N1 async
-            return false;
+            return fail("CTRLC not 8N1");
         }
 
     #endif

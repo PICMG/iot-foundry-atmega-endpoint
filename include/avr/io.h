@@ -9,6 +9,7 @@
 
 #ifdef SIM_HOST
 
+#include "generated_serial_config.h"
 #include <stdint.h>
 
 typedef uint8_t register8_t;
