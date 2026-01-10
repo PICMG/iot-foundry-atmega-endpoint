@@ -2,7 +2,8 @@
 
 *.elf
 *.hex
-*.o
+sim_bin
+
 
 include/generated_serial_config.h
 include/last_fcpu
