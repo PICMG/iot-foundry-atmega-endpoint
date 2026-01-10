@@ -114,6 +114,7 @@ static uint8_t current_tx_slot = 0;
 
 /* FCS calculation moved to src/fcs.c for testability */
 #include "fcs.h"
+#include <cstdio>
 
 /**********************************************************************************
  * static functions.  These are only visible within this file.
@@ -539,7 +540,9 @@ void mctp_update() {
     if (!platform_serial_has_data()) {
         return;
     }
+    fprintf(stderr, "mctp: platform reports data available\n");
     byte_value = platform_serial_read_byte();
+    fprintf(stderr, "mctp: read byte 0x%02x\n", byte_value);
     switch (rxState) {
         case MCTPSER_WAITING_FOR_SYNC:
             if (byte_value == FRAME_CHAR) {

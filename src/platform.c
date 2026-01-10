@@ -31,8 +31,12 @@
 
 #include <stdint.h>
 #include <avr/io.h>
+#include <stdio.h>
 #include "core/platform.h"
 #include "generated_serial_config.h"
+#ifdef SIM_HOST
+#include "../sim/sim_c_api.h"
+#endif
 
 /* Token-paste helpers for deriving register tokens from numeric UART index
  * and port letters emitted by the generator (SERIAL_UART_INDEX, SERIAL_TX_PORT, etc.). */
@@ -141,8 +145,12 @@ void platform_init(void) {
  */
 uint8_t platform_serial_has_data(void) {
     /* RX Complete flag in STATUS register indicates received data */
-    #ifdef USART_RXCIF_bm        
-        return (USART_STATUS & USART_RXCIF_bm) ? 1 : 0;
+    #ifdef USART_RXCIF_bm
+        #ifdef SIM_HOST
+            return (sim_read_usart_status(SERIAL_UART_INDEX) & USART_RXCIF_bm) ? 1 : 0;
+        #else
+            return (USART_STATUS & USART_RXCIF_bm) ? 1 : 0;
+        #endif
     #elif defined(RXC)
         return (USART_STATUS & (1 << RXC)) ? 1 : 0;
     #elif defined(RXC0)
@@ -160,21 +168,34 @@ uint8_t platform_serial_has_data(void) {
 uint8_t platform_serial_read_byte(void) {
     /* Wait for data to be available, then read the low data register */
     #ifdef USART_RXCIF_bm
-    while (!(USART_STATUS & USART_RXCIF_bm)) {
-            ;
-        }
+        #ifdef SIM_HOST
+            while (!(sim_read_usart_status(SERIAL_UART_INDEX) & USART_RXCIF_bm)) { ; }
+        #else
+            while (!(USART_STATUS & USART_RXCIF_bm)) { ; }
+        #endif
     #elif defined(RXC)
-        while (!(USART_STATUS & (1 << RXC))) {
-            ;
-        }
+        #ifdef SIM_HOST
+            while (!(sim_read_usart_status(SERIAL_UART_INDEX) & (1 << RXC))) { ; }
+        #else
+            while (!(USART_STATUS & (1 << RXC))) { ; }
+        #endif
     #elif defined(RXC0)
-        while (!(USART_STATUS & (1 << RXC0))) {
-            ;
-        }
+        #ifdef SIM_HOST
+            while (!(sim_read_usart_status(SERIAL_UART_INDEX) & (1 << RXC0))) { ; }
+        #else
+            while (!(USART_STATUS & (1 << RXC0))) { ; }
+        #endif
     #else
         ;
     #endif
+    /* Debug: print addresses of STATUS and RXDATAL to confirm symbol identity */
+    fprintf(stderr, "platform: addr USART_STATUS=%p USART_RXDATAL=%p\n", (void*)&USART_STATUS, (void*)&USART_RXDATAL);
+    #ifdef SIM_HOST
+    uint8_t b = sim_read_usart_rxdatal(SERIAL_UART_INDEX);
+    #else
     uint8_t b = (uint8_t)USART_RXDATAL;
+    #endif
+    (void)b;
     return (uint8_t)b;
 }
 
@@ -186,21 +207,31 @@ uint8_t platform_serial_read_byte(void) {
 void platform_serial_write_byte(uint8_t b) {   
     /* Wait until Data Register Empty, then write */
     #ifdef USART_DREIF_bm
-        while (!(USART_STATUS & USART_DREIF_bm)) {
-            ;
-        }
+        #ifdef SIM_HOST
+            while (!(sim_read_usart_status(SERIAL_UART_INDEX) & USART_DREIF_bm)) { ; }
+        #else
+            while (!(USART_STATUS & USART_DREIF_bm)) { ; }
+        #endif
     #elif defined(UDRE)
-        while (!(USART_STATUS & (1 << UDRE))) {
-            ;
-        }
+        #ifdef SIM_HOST
+            while (!(sim_read_usart_status(SERIAL_UART_INDEX) & (1 << UDRE))) { ; }
+        #else
+            while (!(USART_STATUS & (1 << UDRE))) { ; }
+        #endif
     #elif defined(UDRE0)
-        while (!(USART_STATUS & (1 << UDRE0))) {
-            ;
-        }
+        #ifdef SIM_HOST
+            while (!(sim_read_usart_status(SERIAL_UART_INDEX) & (1 << UDRE0))) { ; }
+        #else
+            while (!(USART_STATUS & (1 << UDRE0))) { ; }
+        #endif
     #else
         ;
     #endif
-    USART_TXDATAL = b;
+    #ifdef SIM_HOST
+        sim_write_usart_tx(SERIAL_UART_INDEX, b);
+    #else
+        USART_TXDATAL = b;
+    #endif
 }
 
 /**

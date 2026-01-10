@@ -29,6 +29,16 @@
 #include "core/mctp.h"
 #include "core/platform.h"
 
+#ifdef SIM_HOST
+#include <stdio.h>
+#include <fcntl.h>
+#include <unistd.h>
+#include <sys/stat.h>
+#include <string.h>
+#include <errno.h>
+#include <stdlib.h>
+#endif
+
 #ifdef PLDM_SUPPORT
 #include "core/pldm_version.h"
 #endif
@@ -45,11 +55,10 @@
  *             embedded runtime where main runs indefinitely).
  */
 int main(void) {
-    /* initialize the mctp subsystem */
+    /* initialize the mctp subsystem (and platform)*/
     mctp_init();
 
-    /* Set up hardware */
-    platform_init();
+/* Injection removed: PTY test injection is handled externally. */
 
     while (1) {
         /* update the mctp framer state */
