@@ -534,9 +534,20 @@ def build_and_test_for_config(cfg):
 
 
 def main():
-    # Build plan: group by UART type/name/port variant and pick one
-    # representative MCU per group.
-    configs = build_plan_one_representative_per_variant()
+    # Choose plan based on RUN_SIM_MATRIX_MODE env var:
+    # - 'representative' (default): one representative MCU per (type,name,port) variant
+    # - 'one-per-mcu': pick one processor and run all UART/port variants for it
+    # - 'full': expand every included_part x port combination (full matrix)
+    mode = os.environ.get('RUN_SIM_MATRIX_MODE', 'representative')
+    if mode == 'representative':
+        configs = build_plan_one_representative_per_variant()
+    elif mode == 'one-per-mcu':
+        configs = build_plan_one_processor_each()
+    elif mode == 'full':
+        configs = load_configurations()
+    else:
+        print(f'Unknown RUN_SIM_MATRIX_MODE: {mode}; using representative')
+        configs = build_plan_one_representative_per_variant()
     if not isinstance(configs, list):
         print('configurations.json root is not a list')
         sys.exit(2)

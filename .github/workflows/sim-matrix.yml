@@ -1,0 +1,98 @@
+name: Simulator Matrix
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+  schedule:
+    - cron: '0 3 * * *' # nightly full run UTC
+
+jobs:
+  fast-smoke:
+    name: Fast smoke (PR)
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request'
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Cache core sources
+        uses: actions/cache@v4
+        with:
+          path: |
+            src/core
+            include/core
+          key: core-source-${{ runner.os }}-${{ hashFiles('configurations.json') }}
+
+      - name: Ensure core sources
+        run: |
+          if [ ! -d src/core ] || [ ! -d include/core ]; then
+            make download-core || true
+          else
+            echo "Core sources cached; skipping download-core"
+          fi
+
+      - name: Install system deps
+        run: sudo apt-get update && sudo apt-get install -y g++ make wget tar python3-pip
+
+      - name: Install Python deps
+        run: pip3 install -r tests/requirements.txt
+
+      - name: Run representative matrix (all variants)
+        env:
+          RUN_SIM_MATRIX_SKIP_DOWNLOAD: '1'
+          RUN_SIM_MATRIX_QUIET: '0'
+          RUN_SIM_MATRIX_MODE: 'representative'
+        run: python3 tools/run_sim_matrix.py
+
+      - name: Upload logs on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: sim-logs
+          path: |
+            sim.log
+            sim/
+
+  full-matrix-nightly:
+    name: Full matrix (nightly)
+    runs-on: ubuntu-latest
+    if: github.event_name == 'schedule'
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Cache core sources
+        uses: actions/cache@v4
+        with:
+          path: |
+            src/core
+            include/core
+          key: core-source-${{ runner.os }}-${{ hashFiles('configurations.json') }}
+
+      - name: Ensure core sources
+        run: |
+          if [ ! -d src/core ] || [ ! -d include/core ]; then
+            make download-core
+          else
+            echo "Core sources cached; skipping download-core"
+          fi
+
+      - name: Install system deps
+        run: sudo apt-get update && sudo apt-get install -y g++ make wget tar python3-pip
+
+      - name: Install Python deps
+        run: pip3 install -r tests/requirements.txt
+
+      - name: Run full matrix (every processor × port)
+        env:
+          RUN_SIM_MATRIX_SKIP_DOWNLOAD: '1'
+          RUN_SIM_MATRIX_QUIET: '0'
+          RUN_SIM_MATRIX_MODE: 'full'
+        run: python3 tools/run_sim_matrix.py
+
+      - name: Upload logs on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: sim-logs
+          path: |
+            sim.log
+            sim/

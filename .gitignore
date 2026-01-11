@@ -3,6 +3,7 @@
 *.elf
 *.hex
 sim_bin
+sim.log
 
 
 include/generated_serial_config.h
@@ -11,6 +12,8 @@ include/last_build.make
 include/last_mcu
 include/core/
 reports/
+sim/pty_slave.txt
+sim/sim.pid
 src/core/
 tests/__pycache__/
 tools/__pycache__/
