@@ -1,3 +1,15 @@
+#/**
+ * @file sim/sim_types.h
+ * @brief Register types and small helpers used by the host simulator.
+ *
+ * Defines `Reg8`/`Reg16` types, callback signatures, and simple thread-
+ * safe wrappers used by `sim::Simulator` and the register mapping
+ * header `sim_regs.h`.
+ *
+ * This file follows the project's Doxygen commenting conventions.
+ *
+ * @author Doug Sandy
+ */
 #pragma once
 
 #include <cstdint>

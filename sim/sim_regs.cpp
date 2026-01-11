@@ -1,4 +1,14 @@
-// Clean, single-definition simulator implementation.
+#/**
+ * @file sim/sim_regs.cpp
+ * @brief Host-side simulator registers and PTY handling.
+ *
+ * Implements the `sim::Simulator` which owns register state (Reg8/Reg16)
+ * and provides PTY-based serial emulation for testing firmware.
+ *
+ * This file follows the project's Doxygen commenting conventions.
+ *
+ * @author Doug Sandy
+ */
 #include "simulator.h"
 #include "generated_serial_config.h"
 #include "sim_types.h"
@@ -16,6 +26,13 @@
 
 namespace sim {
 
+/**
+ * @brief Construct and initialize the simulator.
+ *
+ * Creates a PTY pair for host<->simulator communication, records the
+ * slave PTY path to `sim/pty_slave.txt`, initializes default register
+ * values, and installs read/write callbacks for serial registers.
+ */
 Simulator::Simulator() {
     master_fd = -1;
     slave_fd = -1;
@@ -84,6 +101,11 @@ Simulator::Simulator() {
     reg8("UCSR3A").set_read_cb([this](){ uint8_t s = ucsra_read_cb(3); return s;});
 }
 
+/**
+ * @brief Destructor for Simulator.
+ *
+ * Closes any open PTY file descriptors.
+ */
 Simulator::~Simulator() {
     if (master_fd >= 0) close(master_fd);
     if (slave_fd >= 0) close(slave_fd);
@@ -98,6 +120,14 @@ Reg8 &Simulator::reg8(const char *name) {
     return *it->second;
 }
 
+/**
+ * @brief Return (and create if necessary) a 8-bit register by name.
+ *
+ * Looks up the register `name` in the simulator registry and constructs
+ * a new `Reg8` instance if it does not yet exist.
+ * @param name The NUL-terminated register name to lookup.
+ * @return A reference to the requested `Reg8`.
+ */
 Reg16 &Simulator::reg16(const char *name) {
     auto it = _r16.find(name);
     if (it == _r16.end()) {
@@ -107,6 +137,14 @@ Reg16 &Simulator::reg16(const char *name) {
     return *it->second;
 }
 
+/**
+ * @brief Return (and create if necessary) a 16-bit register by name.
+ *
+ * Looks up the register `name` in the simulator registry and constructs
+ * a new `Reg16` instance if it does not yet exist.
+ * @param name The NUL-terminated register name to lookup.
+ * @return A reference to the requested `Reg16`.
+ */
 const char* Simulator::init_pty() {
     int mfd = posix_openpt(O_RDWR | O_NOCTTY);
     if (mfd < 0) return nullptr;
@@ -124,6 +162,14 @@ const char* Simulator::init_pty() {
     return slave_name_buf;
 }
 
+/**
+ * @brief Poll the simulator PTY and update status registers non-blocking.
+ *
+ * Checks the PTY associated with `master_fd` for available bytes and sets
+ * the RX complete bit in the appropriate status register when data is
+ * present. This routine does not block.
+ * @param idx USART index to poll for (0..n).
+ */
 void Simulator::poll_pty_nonblocking(int idx) {
     validate_configuration(idx);
 
@@ -150,6 +196,15 @@ void Simulator::poll_pty_nonblocking(int idx) {
     }
 }
 
+/**
+ * @brief Write callback for `USARTn_TXDATAL` registers.
+ *
+ * Called when firmware writes to the TX data register. Updates the
+ * simulator's internal register state, clears data-register-empty flags,
+ * and writes the byte out the PTY when the configuration is valid.
+ * @param idx USART index (0..n)
+ * @param b The byte value being written by firmware.
+ */
 void Simulator::txdatal_write_cb(int idx, uint8_t b) {
     // create the register name
     char txname[32]; 
@@ -184,6 +239,13 @@ void Simulator::txdatal_write_cb(int idx, uint8_t b) {
     }   
 }
 
+/**
+ * @brief Write callback for `UDRn` registers (classic USARTs).
+ *
+ * Mirrors `txdatal_write_cb` behaviour for classic UDR registers.
+ * @param idx UDR index (0..n)
+ * @param b The byte value being written by firmware.
+ */
 void Simulator::udr_write_cb(int idx, uint8_t b) {
     // create the register name
     char txname[32]; 
@@ -213,6 +275,15 @@ void Simulator::udr_write_cb(int idx, uint8_t b) {
     }   
 }
 
+/**
+ * @brief Read callback for status registers (USARTn_STATUS).
+ *
+ * Polls the PTY, inspects and updates transmit-related flags (DRE/TXC)
+ * and may simulate transmission completion. Returns the current status
+ * byte for the requested USART.
+ * @param idx USART index (0..n)
+ * @return The status register value.
+ */
 uint8_t Simulator::status_read_cb(int idx) {
     // create the register name
     char name[32]; 
@@ -264,6 +335,13 @@ uint8_t Simulator::status_read_cb(int idx) {
     return status;
 }
 
+/**
+ * @brief Read callback for `UCSRnA` registers on classic USARTs.
+ *
+ * Mirrors `status_read_cb` semantics for `UCSRnA`-style registers.
+ * @param idx USART index (0..n)
+ * @return The `UCSRnA` register value.
+ */
 uint8_t Simulator::ucsra_read_cb(int idx) {
     // create the register name
     char name[32]; 
@@ -315,6 +393,15 @@ uint8_t Simulator::ucsra_read_cb(int idx) {
     return status;
 }
 
+/**
+ * @brief Validate the simulator configuration for a USART index.
+ *
+ * Ensures baud, DDR, port-mux, and control register settings match the
+ * expected values derived from the generated serial configuration.
+ * On failure, logs a message and returns false.
+ * @param idx USART index to validate
+ * @return true if configuration is acceptable; false otherwise.
+ */
 #define STR_HELPER(x) #x
 #define STR(x) STR_HELPER(x)
 bool Simulator::validate_configuration(int idx) {
@@ -440,6 +527,15 @@ bool Simulator::validate_configuration(int idx) {
     return true;
 }
 
+/**
+ * @brief Read callback for `USARTn_RXDATAL` (receive data).
+ *
+ * Reads one byte from the master PTY if available, updates the RX
+ * register/state and clears the RX complete bit. Returns the byte
+ * previously stored in the register if no new data is available.
+ * @param idx USART index (0..n)
+ * @return The received byte value.
+ */
 uint8_t Simulator::rxdatal_read_cb(int idx) {
     // create the register name
     char txname[32]; 
@@ -477,6 +573,13 @@ uint8_t Simulator::rxdatal_read_cb(int idx) {
     return v;
 }
 
+/**
+ * @brief Read callback for `UDRn` (classic UDR receive).
+ *
+ * Mirrors `rxdatal_read_cb` semantics for classic UDR registers.
+ * @param idx UDR index (0..n)
+ * @return The received byte value.
+ */
 uint8_t Simulator::udr_read_cb(int idx) {
     // create the register name
     char txname[32]; 

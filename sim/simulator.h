@@ -1,3 +1,15 @@
+#/**
+ * @file sim/simulator.h
+ * @brief Declaration of the host-side `sim::Simulator` class.
+ *
+ * The `Simulator` owns register state (Reg8/Reg16), manages a PTY for
+ * host<->firmware serial emulation, and exposes read/write callbacks
+ * used by firmware-compatibility headers.
+ *
+ * This file follows the project's Doxygen commenting conventions.
+ *
+ * @author Doug Sandy
+ */
 #pragma once
 
 #include <string>

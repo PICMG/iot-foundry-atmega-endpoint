@@ -1,3 +1,16 @@
+#/**
+ * @file sim/sim_regs.h
+ * @brief Register mapping macros that redirect legacy register names
+ *        to the single `sim::simulator` instance.
+ *
+ * Keep this header minimal so it can be included in translation units
+ * that expect AVR-like register symbols while routing accesses to the
+ * host-side simulator instance.
+ *
+ * This file follows the project's Doxygen commenting conventions.
+ *
+ * @author Doug Sandy
+ */
 #pragma once
 
 /* Central mapping header that redirects legacy device register symbols
