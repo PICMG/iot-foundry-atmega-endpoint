@@ -142,70 +142,6 @@ The following table shows parameters that may be overridden.
 | `PROG_BAUD` | Baud rate passed to `avrdude` for the chosen programmer (default `115200`).  |
 | `MCU` | MCU used for the build/flash. `make flash` prefers `include/last_mcu` (written by the generator) but you can override with `MCU=<part>` on the command line; the part should match a `part_numbers` entry in `configurations.json`. |
 
-## Board Configuration
-
-This project exposes a small set of build-time switches so you can target
-different ATmega families without editing core code. Key knobs:
-
-- `MCTP_BAUD_MODE`: selects baud calculation mode. Values: `MCTP_BAUD_MODE_DA_DB` (default), `MCTP_BAUD_MODE_CLASSIC`, or `MCTP_BAUD_MODE_AUTO`.
-- Register/alias macros: `MCTP_USART_CTRLA`, `MCTP_USART_CTRLB`, `MCTP_USART_CTRLC`, `MCTP_USART_STATUS`, `MCTP_USART_BAUD`, `MCTP_USART_RXDATAL`, `MCTP_USART_TXDATAL`, `MCTP_TX_PORT_DIR`, `MCTP_RX_PORT_DIR`, `MCTP_UART_TX_PIN`, `MCTP_UART_RX_PIN`.
-
-Build-time serial configuration
--------------------------------
-
-The build now generates a `include/generated_serial_config.h` header from `configurations.json` using `tools/generate_serial_config.py`. Provide the minimal variables to configure serial at build time:
-
-- `MCU` (already used by the Makefile)
-- `SERIAL_BAUD` (required) — e.g. `115200`
-- `SERIAL_UART` (optional) — required if the MCU exposes more than one UART (e.g. `USART1`).
-- `SERIAL_PIN_OPTION` (optional) — index (0-based) selecting the pin mapping when a UART has multiple `ports` options.
-- `F_CPU` (optional) — CPU clock frequency used to compute baud registers; defaults to `16000000` if not set.
-
-CPU clock (`F_CPU`)
--------------------
-
-You can pass the processor clock frequency to `make` using the `F_CPU` variable. This value is used by the generator and by the compiler flags to calculate baud register values. If you do not specify `F_CPU`, the build system uses `16000000` (16 MHz) by default.
-
-Examples:
-
-```
-make MCU=ATmega328P SERIAL_BAUD=115200 F_CPU=8000000
-```
-
-Or rely on the default 16 MHz:
-
-```
-make MCU=ATmega328P SERIAL_BAUD=115200
-```
-
-The Makefile invokes the generator automatically and will fail with a clear message if configuration is ambiguous or missing. The generator computes register values (UBRR / BD) and writes macros such as `SERIAL_BAUD`, `SERIAL_UART_NAME`, `SERIAL_TX_PORT`, `SERIAL_TX_PIN`, and `SERIAL_BAUD_REG_VALUE` into `include/generated_serial_config.h`.
-
-Examples:
-
-- Single-UART MCU (no UART/pin needed):
-```
-make MCU=ATmega328P SERIAL_BAUD=115200
-```
-- Multi-UART MCU, select UART:
-```
-make MCU=ATmega328PB SERIAL_BAUD=38400 SERIAL_UART=USART1
-```
-- Multi-UART with specific pin option (pin option is the index into the `ports` array):
-```
-make MCU=ATmega4809 SERIAL_BAUD=115200 SERIAL_UART=USART2 SERIAL_PIN_OPTION=1
-```
-
-Note: the generated header is placed at `include/generated_serial_config.h` and is automatically included by the build; you can inspect it to see the resolved register values and pin assignments.
-
-Supported UART Architectures
-----------------------------
-
-This repository supports the UART/USART architectures enumerated in `configurations.json`:
-
-- `USART_CLASSIC`: the traditional AVR USART with `UDRn`, `UCSRnA/B/C` and `UBRRn` (UBRR/UBRRL/UBRRH) baud registers and the classic baud equation `BAUD = fclk / (16*(BD+1))`. Typical devices: ATmega48/88/168/328 and similar classic ATmega parts.
-- `USART_0SERIES`: the newer 0-series/DA/DB family where data registers are split (`RXDATALx`/`RXDATAHx`, `TXDATALx`/`TXDATAHx`) and baud is configured via `BAUDx` with routing controlled by `USARTROUTEA`. Baud calculation follows `BAUD = fclk / (2 * BD)`. Typical devices: ATmega808/1608/3208/4808/809/1609/3209/4809.
-
-Note: LIN-style `LIN_UART` entries were intentionally removed from supported configurations and are not generated or validated by the build generator.
 
 Supported processors (from configurations.json)
 ---------------------------------------------
@@ -248,42 +184,20 @@ The build currently supports the following ATmega parts (as listed in `configura
 
 If you need additional parts supported, add them to `configurations.json` and run the validation/generator step (the Makefile will invoke it automatically when building).
 
-Two common targets and how to configure them:
-
-- ATmega4809 (default)
-      - No extra flags required. The build generator produces `include/generated_serial_config.h` from `configurations.json` for the selected `MCU` and `SERIAL_BAUD` and the build uses that header automatically.
-
-- ATmega328P (classic AVR with UBRR)
-      - The generator will emit sensible register aliases and a UBRR writer when possible. Typically you only need to set `MCU` and `SERIAL_BAUD`:
-
-```bash
-make MCU=ATmega328P SERIAL_BAUD=115200
-```
-
-# Editor integration notes
-If your editor expects a `compile_commands.json` compilation database for IDE features (IntelliSense, clangd, etc.), generate one externally from your build system or use your editor's project settings. This repository no longer generates `compile_commands.json` automatically.
-
 # Running device tests
 
 Build and flash the firmware to your device (example target uses default board):
-
-```bash
-make
-make flash
-```
 
 Install Python requirements for the serial test runner:
 
 ```bash
 python3 -m pip install -r tests/requirements.txt
 ```
-
 Run the host-side MCTP test runner against the device serial port (example):
 
 ```bash
 python3 tests/run_mctp_tests.py /dev/ttyACM0 9600
 ```
-
 Notes:
 - Replace `/dev/ttyACM0` with the serial device node for your platform.
 - The host test runner lives at `tests/run_mctp_tests.py` and will print decoded frames and diagnostics.
